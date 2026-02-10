@@ -1,0 +1,5 @@
+python3 git_cherry_picker.py test pre-prod tasks.txt --repo-dir="../eco-backend/"
+python3 git_cherry_picker.py test pre-prod tasks.txt --repo-dir="../eco-auth/"
+python3 git_cherry_picker.py test pre-prod tasks.txt --repo-dir="../eco-notifications/"
+python3 git_cherry_picker.py test pre-prod tasks.txt --repo-dir="../airflow/"
+python3 git_cherry_picker.py test pre-prod tasks.txt --repo-dir="../rpn-handler/"
