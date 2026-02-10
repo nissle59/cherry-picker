@@ -110,6 +110,15 @@ class GitClient:
     def checkout(self, branch: str) -> None:
         self.run(['git', 'checkout', branch])
 
+    def fetch(self):
+        self.run(['git', 'fetch'])
+
+    def pull(self):
+        self.run(['git', 'pull'])
+
+    def create_release_branch(self, release):
+        self.run(['git', 'checkout', '-b', f"release/{release}"])
+
     def cherry_pick(self, hash: str) -> None:
         """Выполняет cherry-pick и выбрасывает исключение при конфликте."""
         result = subprocess.run(
@@ -139,7 +148,7 @@ class CherryPicker:
         self.git = git
         self.verbose = verbose
 
-    def run(self, source: str, target: str, tasks: Set[str], dry_run: bool = False) -> None:
+    def run(self, source: str, target: str, tasks: Set[str], release: str, dry_run: bool = False) -> None:
         print("=" * 70)
         print("Git Cherry Picker (в хронологическом порядке)")
         print("=" * 70)
@@ -155,6 +164,8 @@ class CherryPicker:
         if not self.git.run(['git', 'rev-parse', '--verify', source], check=False):
             print(f"Ошибка: ветка '{source}' не существует.")
             sys.exit(1)
+
+        self.git.fetch()
 
         # Получаем коммиты
         commits = self.git.get_commits_by_tasks(source, tasks)
@@ -181,10 +192,13 @@ class CherryPicker:
         try:
             if target != original:
                 self.git.checkout(target)
+                self.git.pull()
+            self.git.create_release_branch(release)
             self._apply_commits(commits)
         finally:
-            if original and original != self.git.run(['git', 'branch', '--show-current']):
-                self.git.checkout(original)
+            self.git.checkout(f"release/{release}")
+            # if original and original != self.git.run(['git', 'branch', '--show-current']):
+            #     self.git.checkout(original)
 
     def _show_commits(self, commits: List[GitCommit]) -> None:
         """Показывает коммиты в хронологическом порядке."""
@@ -413,12 +427,17 @@ def main():
     parser.add_argument('source', help='Исходная ветка')
     parser.add_argument('target', help='Целевая ветка')
     parser.add_argument('tasks', nargs='+', help='Список задач или файл')
+    parser.add_argument('--release', help='Версия релиза')
     parser.add_argument('--repo-dir', default='./', help='Директория репозитория')
     parser.add_argument('--dry-run', '-d', action='store_true', help='Только показать')
     parser.add_argument('--verbose', '-v', action='store_true', help='Детали')
 
     args = parser.parse_args()
     tasks = parse_tasks(args.tasks)
+
+    if not args.release:
+        print("Ошибка: не указана версия релиза!")
+        sys.exit(1)
 
     if args.repo_dir:
         os.chdir(args.repo_dir)
@@ -429,7 +448,7 @@ def main():
 
     git = GitClient(verbose=args.verbose)
     picker = CherryPicker(git, verbose=args.verbose)
-    picker.run(args.source, args.target, tasks, dry_run=args.dry_run)
+    picker.run(args.source, args.target, tasks, dry_run=args.dry_run, release=args.release)
 
 
 if __name__ == "__main__":
