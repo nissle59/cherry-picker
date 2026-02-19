@@ -1,49 +1,98 @@
 import sys
+import os
+from dataclasses import dataclass
 from jira import JIRA
 from urllib3 import disable_warnings
+from dotenv import load_dotenv
+
+load_dotenv()
 disable_warnings()
 
-token = "YOUR_PERSONAL_TOKEN_HERE"
-PROJECT_ID = "24108"
+
+@dataclass
+class Config:
+    """Класс для хранения конфигурации"""
+    jira_token: str
+    project_id: str
+    jira_server: str = "https://jira.mts.ru"
+
+    @classmethod
+    def from_env(cls):
+        """Создает конфигурацию из переменных окружения"""
+        jira_token = os.getenv('JIRA_TOKEN')
+        project_id = os.getenv('PROJECT_ID')
+        jira_server = os.getenv('JIRA_SERVER', 'https://jira.mts.ru')
+
+        if not jira_token or not project_id:
+            missing = []
+            if not jira_token:
+                missing.append('JIRA_TOKEN')
+            if not project_id:
+                missing.append('PROJECT_ID')
+            raise ValueError(f"Отсутствуют обязательные переменные: {', '.join(missing)}")
+
+        return cls(
+            jira_token=jira_token,
+            project_id=project_id,
+            jira_server=jira_server
+        )
 
 
-def jira_search(v: str):
+def jira_search(v: str, config: Config):
     jira = JIRA(options={
-        "server": "https://jira.mts.ru",
+        "server": config.jira_server,
         "verify": False
-    }, token_auth=token)
+    }, token_auth=config.jira_token)
+
     vid = None
-    versions = jira.project_versions(PROJECT_ID)
+    versions = jira.project_versions(config.project_id)
+
     for version in versions:
         if version.name == v:
-            print("Found version: " + version.name)
+            print(f"Найдена версия: {version.name}")
             vid = version.id
 
     if vid is None:
-        return None
+        print(f"Версия {v} не найдена")
+        return []
+
     issues = jira.search_issues(
-        f'project = {PROJECT_ID} '
+        f'project = {config.project_id} '
         f'AND fixVersion = {vid} '
         f'OR issueFunction in '
-        f'subtasksOf("project = {PROJECT_ID} AND fixVersion = {vid}") '
+        f'subtasksOf("project = {config.project_id} AND fixVersion = {vid}") '
         f'ORDER BY priority DESC, key ASC'
     )
-    keys = []
-    for issue in issues:
-        keys.append(issue.key)
-    return keys
+
+    return [issue.key for issue in issues]
 
 
 if __name__ == "__main__":
-    # Проверяем, передан ли аргумент
-    if len(sys.argv) < 2:
-        print("Ошибка: не указана версия")
-        print("Использование: python script.py <VERSION>")
-        sys.exit(1)
+    try:
+        # Загружаем конфигурацию
+        config = Config.from_env()
 
-    VERSION = sys.argv[1]  # Берем версию из аргументов командной строки
-    tasks = jira_search(VERSION)
-    with open('tasks.txt', 'w') as f:
-        for task in tasks:
-            print(task)
-            f.write(task + '\n')
+        # Проверяем аргументы командной строки
+        if len(sys.argv) < 2:
+            print("Ошибка: не указана версия")
+            print("Использование: python script.py <VERSION>")
+            sys.exit(1)
+
+        VERSION = sys.argv[1]
+        tasks = jira_search(VERSION, config)
+
+        if tasks:
+            with open('tasks.txt', 'w') as f:
+                for task in tasks:
+                    print(task)
+                    f.write(task + '\n')
+            print(f"\nНайдено задач: {len(tasks)}. Результаты сохранены в tasks.txt")
+        else:
+            print("Задачи не найдены")
+
+    except ValueError as e:
+        print(f"Ошибка конфигурации: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Ошибка при выполнении: {e}")
+        sys.exit(1)
