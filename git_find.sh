@@ -1,4 +1,4 @@
-RELEASE_VER="1.2.1"
+RELEASE_VER="2.2.1"
 SOURCE_BRANCH="test"
 TARGET_BRANCH="pre-prod"
 
@@ -10,6 +10,7 @@ REPOS=(
   "../rpn-handler/"
 )
 
+pip install -r requirements.txt
 python3 jira-connect.py $RELEASE_VER
 
 for REPO in "${REPOS[@]}"; do
