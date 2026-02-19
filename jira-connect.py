@@ -57,7 +57,8 @@ def jira_search(v: str, config: Config):
         return []
 
     issues = jira.search_issues(
-        f'project = {config.project_id} '
+        f'statusCategory = done '
+        f'AND project = {config.project_id} '
         f'AND fixVersion = {vid} '
         f'OR issueFunction in '
         f'subtasksOf("project = {config.project_id} AND fixVersion = {vid}") '
