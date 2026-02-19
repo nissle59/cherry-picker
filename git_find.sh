@@ -10,6 +10,8 @@ REPOS=(
   "../rpn-handler/"
 )
 
+python3 jira-connect.py $RELEASE_VER
+
 for REPO in "${REPOS[@]}"; do
     if [ -d "$REPO" ]; then
         echo "Обработка репозитория: $REPO"
